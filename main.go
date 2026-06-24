@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,8 +23,8 @@ func (c *WebDriverClient) CreateSession(browserName string) error {
 				"browserName": browserName,
 				"moz:firefoxOptions": map[string]interface{}{
 					"prefs": map[string]interface{}{
-						"dom.webdriver.enabled": true,
-						"enable_automation":     true,
+						"dom.webdriver.enabled": false,
+						"enable_automation":     false,
 					},
 					"args": []string{
 						// TODO: Put this into a config
@@ -67,39 +68,151 @@ func (c *WebDriverClient) DeleteSession() {
 	http.DefaultClient.Do(req)
 }
 
-func (c *WebDriverClient) GetSource() (string) {
-    req, _ := http.NewRequest("GET", c.BaseURL+"/session/"+c.SessionID+"/source", nil)
+func (c *WebDriverClient) GetSource() string {
+	req, _ := http.NewRequest("GET", c.BaseURL+"/session/"+c.SessionID+"/source", nil)
 
-    resp, _ := http.DefaultClient.Do(req)
-    // Ensure the body is closed after reading
-    defer resp.Body.Close()
-    // Read the body content
-    body, _ := io.ReadAll(resp.Body)
-    b := string(body)
-    return b
+	resp, _ := http.DefaultClient.Do(req)
+	// Ensure the body is closed after reading
+	defer resp.Body.Close()
+	// Read the body content
+	body, _ := io.ReadAll(resp.Body)
+	b := string(body)
+	return b
 }
+
+func (c *WebDriverClient) GetTitle() string {
+	req, _ := http.NewRequest("GET", c.BaseURL+"/session/"+c.SessionID+"/title", nil)
+
+	resp, _ := http.DefaultClient.Do(req)
+	// Ensure the body is closed after reading
+	defer resp.Body.Close()
+	// Read the body content
+	body, _ := io.ReadAll(resp.Body)
+	b := string(body)
+	return b
+}
+
+func (c *WebDriverClient) GetUrl() string {
+	req, _ := http.NewRequest("GET", c.BaseURL+"/session/"+c.SessionID+"/url", nil)
+
+	resp, _ := http.DefaultClient.Do(req)
+	// Ensure the body is closed after reading
+	defer resp.Body.Close()
+	// Read the body content
+	body, _ := io.ReadAll(resp.Body)
+	b := string(body)
+	return b
+}
+
+func (c *WebDriverClient) NewWin() {
+	req, _ := http.NewRequest("POST", c.BaseURL+"/session/"+c.SessionID+"/window/new", nil)
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+}
+
+func (c *WebDriverClient) FindElement(sType, selector string) string {
+	payload := map[string]string{"using": sType, "value": selector}
+	data, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", c.BaseURL+"/session/"+c.SessionID+"/element", bytes.NewBuffer(data))
+	resp, _ := http.DefaultClient.Do(req)
+	defer resp.Body.Close()
+	// Read the body content
+	body, _ := io.ReadAll(resp.Body)
+	b := string(body)
+	return b
+}
+
+func (c *WebDriverClient) Screenshot() string {
+	req, _ := http.NewRequest("GET", c.BaseURL+"/session/"+c.SessionID+"/screenshot", nil)
+
+	resp, _ := http.DefaultClient.Do(req)
+	// Ensure the body is closed after reading
+	defer resp.Body.Close()
+	// Read the body content
+	body, _ := io.ReadAll(resp.Body)
+	b := string(body)
+	return b
+}
+
+func (c *WebDriverClient) Refresh() {
+	req, _ := http.NewRequest("POST", c.BaseURL+"/session/"+c.SessionID+"/refresh", nil)
+
+	resp, _ := http.DefaultClient.Do(req)
+	// Ensure the body is closed after reading
+	defer resp.Body.Close()
+}
+
+
+func (c *WebDriverClient) Back() {
+	req, _ := http.NewRequest("POST", c.BaseURL+"/session/"+c.SessionID+"/back", nil)
+
+	resp, _ := http.DefaultClient.Do(req)
+	// Ensure the body is closed after reading
+	defer resp.Body.Close()
+}
+func (c *WebDriverClient) Forward() {
+	req, _ := http.NewRequest("POST", c.BaseURL+"/session/"+c.SessionID+"/forward", nil)
+
+	resp, _ := http.DefaultClient.Do(req)
+	// Ensure the body is closed after reading
+	defer resp.Body.Close()
+}
+
+
+
+
+
+
 func main() {
-	// TODO: make exe dependent on the flags and other things 
+	// Define CLI Flags
+	port := 0
+	browserPtr := flag.String("b", "firefox", "Browser name (firefox/chrome)")
+	ctxPtr := flag.String("ctx", "", "Browser Context to automate")
+	flag.Parse()
 
-	// TODO:  Configuration: change to 9515 for Chrome or 4444 for Firefox
-	client := WebDriverClient{BaseURL: "http://localhost:4444"}
-
-//	fmt.Println("Starting session...")
-	if err := client.CreateSession("firefox"); err != nil {
-		fmt.Printf("Could not connect: %v\n", err)
-		os.Exit(1)
+	if(*browserPtr == "firefox") {
+		port = 4444
+	} else if(*browserPtr == "chrome") {
+		port = 37679
 	}
-//	fmt.Printf("Session %s started.\n", client.SessionID)
 
-//	fmt.Println("Navigating to https://archlinux.org...")
-	client.NavigateTo("")
+	client := WebDriverClient{BaseURL: fmt.Sprintf("http://localhost:%d", port)}
+	if(*ctxPtr == "") {
+		client.CreateSession(*browserPtr)
+		fmt.Println(client.SessionID)
+		os.Exit(0)
+	} else {
+		client.SessionID = *ctxPtr
+	}
+	// Initialize
 
-	f := client.GetSource()
-	fmt.Println(f)
-
-//	fmt.Println("Press Enter to close the session...")
-//	fmt.Scanln()
-
-	client.DeleteSession()
-//	fmt.Println("Session closed.")
+	switch flag.Arg(0) {
+	case "navigate": {
+		client.NavigateTo(flag.Arg(1))
+	}
+	case "close": {
+		client.DeleteSession()
+	}
+	case "src": {
+		out := client.GetSource()
+		fmt.Println(out)
+	}
+	case "url": {
+		out := client.GetUrl()
+		fmt.Println(out)
+	}
+	case "title": {
+		out := client.GetTitle()
+		fmt.Println(out)
+	}
+	case "refresh": {
+		client.Refresh()
+	}
+	case "back": {
+		client.Back()
+	}
+	case "forward": {
+		client.Forward()
+	}
 }
